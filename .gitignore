@@ -165,3 +165,5 @@ secrets.json
 
 # 如果你跑的 benchmark 结果想全留版本控制（推荐，方便 writeup 回溯），
 # 把第 7 节里 "benchmark_results" 那两行注释掉即可。
+
+uv.lock.bak
