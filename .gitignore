@@ -1,0 +1,167 @@
+# ============================================================
+# CS336 Assignment 2 (Systems) .gitignore
+# 环境栈：Python 3.12 / uv / PyTorch / Triton / pytest / ruff
+# ============================================================
+
+# ---------- 1. Python 运行时产物 ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+build/
+dist/
+sdist/
+wheels/
+*.manifest
+*.spec
+MANIFEST
+
+# ---------- 2. 虚拟环境（uv / venv / conda）----------
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.python-version
+# conda 用户额外加：
+.conda/
+conda-meta/
+
+# ⚠️ uv.lock 一定要提交（保证复现性），不要忽略它
+!uv.lock
+
+# ---------- 3. 测试 & 质量工具缓存 ----------
+.pytest_cache/
+.cache/
+.hypothesis/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.dmypy.json
+.ruff_cache/
+.pyre/
+.pytype/
+cython_debug/
+
+# ---------- 4. Jupyter / IPython ----------
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+*.ipynb_metadata
+
+# ---------- 5. IDE / 编辑器 ----------
+.idea/
+.vscode/
+!.vscode/extensions.json   # 团队共享插件推荐可以留
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+.claude/
+.cursor/
+.aider*
+
+# ---------- 6. PyTorch / 训练产物（重点，体积大）----------
+# 模型权重 & 优化器状态（单文件轻松 >1GB，绝对不能提交）
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+checkpoints/
+checkpoint/
+runs/
+outputs/
+# HuggingFace / datasets 缓存
+.cache/huggingface/
+.cache/torch/
+hf_cache/
+data/
+# Triton JIT 编译缓存
+.triton/
+# NCCL / torch distributed 调试日志
+nccl_*.log
+torch_*.log
+
+# ---------- 7. Profiling 产物（A2 writeup 数据源）----------
+# Nsight Systems 报告：几百 MB 起步
+*.nsys-rep
+*.nsys-analysis
+*.qdstrm
+*.qdrep
+# Nsight Compute
+*.ncu-rep
+# PyTorch memory_viz snapshot pickle
+*.pickle
+memory_snapshot/
+# 自定义 csv benchmark 结果
+# （写 writeup 时如果想留最终版结果，用 ! 例外放行）
+**/benchmark_results/*.csv
+**/profiling/*.csv
+!**/final_results/*.csv
+
+# ---------- 8. 日志 ----------
+*.log
+logs/
+*.log.*
+
+# ---------- 9. 临时文件 / 备份 ----------
+*.tmp
+*.bak
+*.swp
+*.swo
+*.orig
+*.rej
+
+# ---------- 10. CS336 提交脚本产物 ----------
+# ./test_and_make_submission.sh 会生成 tar.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+submission/
+submissions/
+code.zip
+test_results.xml
+junit*.xml
+
+# ---------- 11. 密钥 / 凭据 ----------
+.env
+.envrc
+.env.*
+!.env.example
+*.pem
+*.key
+api_keys.py
+secrets.json
+
+# ============================================================
+# ⚠️ 关键例外：以下文件必须保留在 git 里，任何通配符都不要覆盖它们
+# ============================================================
+!pyproject.toml
+!uv.lock
+!requirements.txt
+!tests/**
+!cs336_basics/**
+!cs336_systems/**
+!cs336_assignment2_systems.pdf
+!cs336_assignment1_basics.pdf
+!writeup.pdf
+!writeup/*
+!README.md
+!.gitignore
+
+# 如果你确实想忽略 writeup.pdf，把上面那一行删掉并解开下面这行：
+# writeup.pdf
+
+# 如果你跑的 benchmark 结果想全留版本控制（推荐，方便 writeup 回溯），
+# 把第 7 节里 "benchmark_results" 那两行注释掉即可。
