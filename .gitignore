@@ -2,7 +2,7 @@
 # CS336 Assignment 2 (Systems) .gitignore
 # 环境栈：Python 3.12 / uv / PyTorch / Triton / pytest / ruff
 # ============================================================
-
+.pyc
 # ---------- 1. Python 运行时产物 ----------
 __pycache__/
 *.py[cod]
