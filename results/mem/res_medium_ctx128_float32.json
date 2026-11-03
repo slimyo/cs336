@@ -1,0 +1,125 @@
+{
+  "model": "medium",
+  "ctx": 128,
+  "batch": 4,
+  "dtype": "float32",
+  "status": "OK",
+  "stage": "done",
+  "matmul_precision": "highest",
+  "theory": {
+    "P": 423183360,
+    "static_fwd": 1.5764808654785156,
+    "static_train": 6.3059234619140625,
+    "act_est": 2.1387939453125,
+    "peak_est": 8.444717407226562
+  },
+  "probes": {
+    "weights_gib": 1.5862846374511719,
+    "fwd_nograd_peak_gib": 1.6448822021484375,
+    "saved_act_gib": 1.6413350105285645,
+    "fwd_grad_peak_gib": 3.2666854858398438,
+    "static_with_adam_gib": 4.750843048095703
+  },
+  "train": {
+    "base_gib": 4.750843048095703,
+    "fwd": {
+      "end": 6.392178058624268,
+      "peak": 6.431243896484375,
+      "reserved_peak": 6.44921875
+    },
+    "comp_after_fwd": {
+      "total": 6.392178058624268,
+      "weights": 1.5764808654785156,
+      "grads": 0.0,
+      "adam": 3.1529617309570312,
+      "other": 1.6627354621887207
+    },
+    "bwd": {
+      "end": 6.329155445098877,
+      "peak": 6.431235313415527,
+      "reserved_peak": 6.52734375
+    },
+    "comp_after_bwd": {
+      "total": 6.329155445098877,
+      "weights": 1.5764808654785156,
+      "grads": 1.5764808654785156,
+      "adam": 3.1529617309570312,
+      "other": 0.023231983184814453
+    },
+    "opt": {
+      "end": 6.329155445098877,
+      "peak": 6.524467945098877,
+      "reserved_peak": 6.72265625
+    },
+    "train_peak_gib": 6.524467945098877,
+    "reserved_peak_gib": 6.72265625
+  },
+  "P": 423183360,
+  "snapshot": "results/mem/mem_medium_ctx128_float32.pickle",
+  "trace": {
+    "n_events": 19227,
+    "peak_gib": 6.518058780580759,
+    "peak_event": 10055,
+    "tags_gib": {
+      "静态(权重+Adam)": 4.750843048095703,
+      "backward(梯度/临时)": 1.576480869203806,
+      "optimizer 临时": 0.19073486328125
+    },
+    "top_live": [
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 16.0,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      }
+    ],
+    "largest": [
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      },
+      {
+        "mib": 39.0625,
+        "stack": "??:0 torch::unwind::unwind() <- ??:0 torch::CapturedTraceback::gather(bool, bool, bool) <- memory_snapshot.cpp:0 torch::cuda::(anonymous namespace)::gather_with_cpp()"
+      }
+    ]
+  }
+}

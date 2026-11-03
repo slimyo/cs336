@@ -36,7 +36,7 @@ MODEL_CONFIGS = {
 }
 VOCAB_SIZE = 10000
 ROPE_THETA = 10000.0
-DTYPES = {"float32": torch.float32, "bfloat16": torch.bfloat16}
+DTYPES = {"float32": torch.float32, "bfloat16": torch.bfloat16, "tf32":'tf32'}
 
 
 def parse_args():
@@ -120,10 +120,19 @@ def build(args):
 def make_fns(model, x, y, opt, cross_entropy, dtype):
     last = {}                                     # 记录最后一次 loss（张量，不在计时里 .item()）
 
-    def amp():
-        if dtype == torch.bfloat16:
-            return torch.autocast("cuda", dtype=torch.bfloat16)
-        return contextlib.nullcontext()
+    # def amp():
+    #     if dtype == torch.bfloat16:
+    #         return torch.autocast("cuda", dtype=torch.bfloat16)
+    #     return contextlib.nullcontext()
+    if dtype == 'tf32':
+        torch.backends.cuda.matmul.allow_tf32 = True
+        amp = lambda: contextlib.nullcontext()
+    elif dtype == torch.bfloat16:
+        torch.backends.cuda.matmul.allow_tf32 = False   # 防串味
+        amp = lambda: torch.autocast("cuda", dtype=torch.bfloat16)
+    else:  # fp32
+        torch.backends.cuda.matmul.allow_tf32 = False
+        amp = lambda: contextlib.nullcontext()
 
     def loss_of():
         with amp():

@@ -5,8 +5,9 @@
 torch.cuda.synchronize()，把该阶段发射的 GPU 工作全部收进对应 NVTX 时间窗，
 nsys 按窗口归因（12.8 方案 A：backward 的 kernel 用时间窗选取）。
 
-模型配置、dtype 语义（bfloat16 = fp32 权重 + autocast）、optimizer 选择与
-benchmark.py 保持一致，nsys/ncu 看到的构成才能和 benchmark 的时间、第 11 章的预测对上。
+模型配置、dtype 语义（bfloat16 = fp32 权重 + autocast；tf32 = fp32 权重 +
+matmul.allow_tf32）、optimizer 选择与 benchmark.py 保持一致，nsys/ncu 看到
+的构成才能和 benchmark 的时间、第 11 章的预测对上。
 
 nsys（12.6）：
   CUDA_VISIBLE_DEVICES=0 uv run nsys profile \
@@ -19,6 +20,9 @@ nsys（12.6）：
 ncu（12.10）：同一脚本。--profile-from-start off 对应本文件的
 profiler.start()/stop()；-k / -c / --nvtx-include 过滤，先 -c 1 试通。
 ncu 建议 --warmup 2 --steps 1（每个 kernel 会被重放多次）。
+
+注意：--dtype tf32 会让 GEMM 走 tensor-core 路径，kernel 序列与 float32
+不同，ncu 的 -s 序号需重新数（先 --steps 1 不带过滤全采一遍核对）。
 """
 from __future__ import annotations
 
@@ -31,7 +35,7 @@ import torch
 import torch.cuda.nvtx as nvtx
 from einops import einsum
 
-# 第 10 章的前提：TF32 关闭
+# 第 10 章的前提：TF32 默认关闭（--dtype tf32 时在 make_fns 里打开）
 torch.backends.cuda.matmul.allow_tf32 = False
 torch.backends.cudnn.allow_tf32 = False
 torch.set_float32_matmul_precision("highest")
@@ -60,7 +64,7 @@ MODEL_CONFIGS = {
 VOCAB_SIZE = {"tiny": 1000}          # 其余模型 10000
 DEFAULT_VOCAB = 10000
 ROPE_THETA = 10000.0
-DTYPES = {"float32": torch.float32, "bfloat16": torch.bfloat16}
+DTYPES = {"float32": torch.float32, "bfloat16": torch.bfloat16, "tf32": "tf32"}
 
 # 自检计数：每个被标注的模块类、以及替换后的 sdpa 被调用了多少次
 COUNTS: collections.Counter = collections.Counter()
@@ -84,7 +88,7 @@ def annotated_sdpa(Q, K, V, mask=None):
 
 def add_nvtx_hooks(model, names=("RMSNorm", "CausalMultiHeadSelfAttention", "SwiGLU",
                                  "TransformerBlock", "Embedding", "Linear")):
-    """模块级 push/pop hook（只覆盖 forward）。区间名=类名。             
+    """模块级 push/pop hook（只覆盖 forward）。区间名=类名。
 
     hook 必须返回 None：pre-hook 返回非 None 会被当作"替换后的输入"，
     forward hook 返回非 None 会被当作"替换后的输出"，而 range_push/range_pop
@@ -125,7 +129,8 @@ def parse_args():
     p.add_argument("--ctx", type=int, default=512)
     p.add_argument("--batch", type=int, default=4)
     p.add_argument("--dtype", choices=list(DTYPES), default="float32",
-                   help="bfloat16 = fp32 权重 + autocast（与 benchmark.py 一致）")
+                   help="bfloat16 = fp32 权重 + autocast；tf32 = fp32 权重 + "
+                        "matmul.allow_tf32（语义与 benchmark.py 一致）")
     p.add_argument("--mode", choices=["fwd", "fwdbwd", "full"], default="full")
     p.add_argument("--warmup", type=int, default=5)
     p.add_argument("--steps", type=int, default=3)
@@ -142,7 +147,7 @@ def parse_args():
 
 def build(args):
     """staff 构造签名没有 device/dtype：先建再 .cuda()（RoPE buffer 一并搬移）。
-    权重始终 fp32；bf16 通过 autocast 实现，与 benchmark.py 同一语义。"""
+    权重始终 fp32；bf16 走 autocast、tf32 走 allow_tf32，与 benchmark.py 同一语义。"""
     torch.manual_seed(args.seed)
     cfg = dict(MODEL_CONFIGS[args.model])
     V = VOCAB_SIZE.get(args.model, DEFAULT_VOCAB)
@@ -164,55 +169,64 @@ def build(args):
     return model, x, y, opt, impl, cfg, V
 
 
-def make_step(model, x, y, opt, mode, V, dtype):
-    """返回 step_once()：一个完整测量步，与 benchmark.py 三档模式对应。"""
+def make_fns(model, x, y, opt, V, dtype):
+    """与 benchmark.py 对齐。"""
+    last = {}
 
-    def amp():
-        if dtype == torch.bfloat16:
-            return torch.autocast("cuda", dtype=torch.bfloat16)
-        return contextlib.nullcontext()
+    if dtype == "tf32":
+        torch.backends.cuda.matmul.allow_tf32 = True
+        amp = lambda: contextlib.nullcontext()
+    elif dtype == torch.bfloat16:
+        torch.backends.cuda.matmul.allow_tf32 = False   # 防串味
+        amp = lambda: torch.autocast("cuda", dtype=torch.bfloat16)
+    else:  # float32
+        torch.backends.cuda.matmul.allow_tf32 = False
+        amp = lambda: contextlib.nullcontext()
+
+    def loss_of():
+        with amp():
+            logits = model(x)                                # (B, T, V)
+        flat_logits = logits.view(-1, V).float()             # loss 在 fp32 里算
+        if cross_entropy is not None:
+            loss = cross_entropy(flat_logits, y.view(-1))
+        else:
+            loss = torch.nn.functional.cross_entropy(flat_logits, y.view(-1))
+        last["loss"] = loss.detach()
+        return loss
 
     def forward_only():
-        with torch.no_grad():              # fwd 模式：与 11.5 forward 预测同前提
+        with torch.no_grad():              # fwd：与 11.5 forward 预测同前提
             with amp():
                 model(x)
 
-    def fwd_and_loss():
-        with amp():
-            logits = model(x)                                    # (B, T, V)
-        flat_logits = logits.view(-1, V).float()                 # loss 在 fp32 里算
-        flat_labels = y.view(-1)
-        if cross_entropy is not None:
-            return cross_entropy(flat_logits, flat_labels)
-        return torch.nn.functional.cross_entropy(flat_logits, flat_labels)
-
-    def opt_step_and_zero():
-        opt.step()
-        opt.zero_grad(set_to_none=True)   # 不发射 GPU kernel
-
-    def step_once():
+    def fwd():
         with nvtx.range("step"):
-            if mode == "fwd":
-                phase("forward", forward_only)
-                return None
-            if mode == "fwdbwd":
-                # set_to_none 不发射 kernel；保证每步反向从"无 grad"开始，
-                # kernel 序列逐 step 一致（否则第 2 步起多出梯度累加的 add kernel）
-                opt.zero_grad(set_to_none=True)
-            loss = phase("forward", fwd_and_loss)
-            phase("backward", loss.backward)
-            if mode == "full":
-                phase("optimizer", opt_step_and_zero)
-            return loss
+            phase("forward", forward_only)
 
-    return step_once
+    def fwdbwd():
+        with nvtx.range("step"):
+            # set_to_none 不发射 kernel；保证每步反向从"无 grad"开始，
+            # kernel 序列逐 step 一致（否则第 2 步起多出梯度累加的 add kernel）
+            opt.zero_grad(set_to_none=True)
+            loss = phase("forward", loss_of)
+            phase("backward", loss.backward)
+
+    def full():
+        with nvtx.range("step"):
+            opt.zero_grad(set_to_none=True)
+            loss = phase("forward", loss_of)
+            phase("backward", loss.backward)
+            phase("optimizer", opt.step)
+
+    return {"fwd": fwd, "fwdbwd": fwdbwd, "full": full}, last
 
 
 def main():
     args = parse_args()
     assert torch.cuda.is_available(), "profile_run 必须在 GPU 上跑"
     model, x, y, opt, opt_impl, cfg, V = build(args)
-    step_once = make_step(model, x, y, opt, args.mode, V, DTYPES[args.dtype])
+    fns, last = make_fns(model, x, y, opt, V, DTYPES[args.dtype])
+    step_once = fns[args.mode]           # 本进程只跑一档：capture range 只开一次
 
     handles = []
     if args.nvtx_fine:
@@ -226,8 +240,8 @@ def main():
     print(f"model={args.model} params={n_params / 1e6:.2f}M optimizer={opt_impl} "
           f"mode={args.mode} ctx={args.ctx} batch={args.batch} dtype={args.dtype}")
     print(f"warmup={args.warmup} steps={args.steps} nvtx_fine={args.nvtx_fine} "
-          f"emit_nvtx={args.emit_nvtx} (TF32 off)")
-    print("[提醒] 每 phase 同步 + profiler 开销：只看构成，绝对时间以 benchmark.py 为准")
+          f"emit_nvtx={args.emit_nvtx} "
+          f"(matmul_tf32={torch.backends.cuda.matmul.allow_tf32})")
 
     for _ in range(args.warmup):           # 预热：cuBLAS/懒加载/优化器状态，不在 capture range 内
         step_once()
