@@ -193,7 +193,7 @@ num_stages 通常是最敏感参数，编译报错为准试探。
 | 1024 | 64 | bf16 |  |  |  |  |  |
 | 4096 | 64 | bf16 |  |  |  |  |  |
 | 16384 | 64 | bf16 |  |  |  |  |  |
-| 65536 | 64 | bf16 |  |  |  |  |  |
+| 65536 | 64 | bf16 |  |  |  |  |  | 
 
 **backward 与 fwd+bwd**
 | seq | d | dtype | PyTorch bwd (ms) | FA bwd (ms) | PyTorch fwd+bwd (ms) | FA fwd+bwd (ms) |
